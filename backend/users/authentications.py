@@ -41,6 +41,16 @@ class MongoUser:
     def id(self):
         # Return user's '_id' from MongoDB
         return self._user_dict.get('_id')
+    
+    @property
+    def _id(self):
+        # Alias for the 'id' attribute
+        return str(self._user_dict.get('_id'))
+    
+    @property
+    def email(self):
+        # Get email from user dictionary
+        return self._user_dict.get('email')
 
 
 class MongoDBJWTAuthentication(authentication.BaseAuthentication):

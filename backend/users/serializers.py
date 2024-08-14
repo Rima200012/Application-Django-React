@@ -23,6 +23,7 @@ class UserSerializer(serializers.Serializer):
     city = serializers.CharField(max_length=100, required=False)
     state = serializers.CharField(max_length=100, required=False)
     country = serializers.CharField(max_length=100, required=False)
+    email_verified = serializers.BooleanField(default=False)
 
     def validate_email(self, value):
         # MongoDB query to check if email already exists

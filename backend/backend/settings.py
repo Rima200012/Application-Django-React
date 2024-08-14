@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "Jobs",
     "candidate",
     "AI",
+    "KPI",
 ]
 
 MIDDLEWARE = [
@@ -90,9 +91,11 @@ MIDDLEWARE = [
 ]
 ALLOWED_HOSTS = [
     "127.0.0.1", 
+    "localhost",
 ]
 CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1',  # Add your Vite URL here
+    'http://localhost:5173',
 ]
 
 CORS_ALLOW_HEADERS = [
@@ -116,6 +119,11 @@ CORS_ALLOW_METHODS = [
 ]
 
 ROOT_URLCONF = "backend.urls"
+
+# settings.py
+
+FRONTEND_URL = "http://localhost:5173"  # Replace with your frontend URL
+
 
 TEMPLATES = [
     {
@@ -229,7 +237,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTHENTICATION_BACKENDS = ['path.to.MongoDBAuthBackend']
 # settings.py
 
-
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'hadil.lamloumi123@gmail.com'
+EMAIL_HOST_PASSWORD = 'nstu pvti wqjx rhkj'
 
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = False

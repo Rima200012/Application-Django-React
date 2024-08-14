@@ -14,6 +14,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import os
 import logging
+from rest_framework import status
 
 class JobPostAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -167,6 +168,31 @@ class JobApplicationDetailAPIView(APIView):
         else:
             return Response({"message": "Job application not found"}, status=status.HTTP_404_NOT_FOUND)
 
+
+
+class UpdateApplicationStatus(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def put(self, request, id):
+        application = get_job_application_collection().find_one({'_id': ObjectId(id)})
+        if application is not None:
+            status_value = request.data.get('status')
+            if status_value:
+                get_job_application_collection().update_one(
+                    {'_id': ObjectId(id)},
+                    {'$set': {'status': status_value}}
+                )
+                application['status'] = status_value
+                return Response(
+                    {"message": "Application status updated successfully", "application": JobApplicationSerializer(application).data},
+                    status=status.HTTP_200_OK
+                )
+            return Response({"message": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "Job application not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+
+logger = logging.getLogger(__name__)
+
 class JobApplicationsByJobPostAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -176,11 +202,19 @@ class JobApplicationsByJobPostAPIView(APIView):
         for app in applications:
             app['_id'] = str(app['_id'])  # Convert ObjectId to string for JSON serialization
             app['job_post_id'] = str(app['job_post_id'])  # Ensure job_post_id is a string
+        if not applications:
+            return Response({"message": "No applicants found"}, status=status.HTTP_200_OK)
         serializer = JobApplicationSerializer(applications, many=True)
         logger.debug(f"Applications fetched: {serializer.data}")
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
+class JobApplicationCountAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
+    def get(self, request, job_post_id):
+        count = get_job_application_collection().count_documents({"job_post_id": job_post_id})
+        return Response({"count": count}, status=status.HTTP_200_OK)
+    
 class JobPostsByUserAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

@@ -19,6 +19,9 @@ function ManageJobPosts() {
   const [recommendations, setRecommendations] = useState([]);
   const [recommendationModalVisible, setRecommendationModalVisible] = useState(false);
   const [resumePdfUrl, setResumePdfUrl] = useState("");
+  const [lastSavedRecommendations, setLastSavedRecommendations] = useState([]);
+  const [lastSavedRecommendationModalVisible, setLastSavedRecommendationModalVisible] = useState(false);
+  const [noSavedRecommendationsMessage, setNoSavedRecommendationsMessage] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,7 +43,25 @@ function ManageJobPosts() {
 
           if (jobPostsRes.status === 200) {
             const userJobPosts = jobPostsRes.data.filter(post => post.published_by === userId);
-            setJobPosts(userJobPosts);
+            // Fetch applicant counts for each job post
+          const applicantCountsRes = await Promise.all(
+            userJobPosts.map(async (post) => {
+              const countRes = await api.get(`/Jobs/jobposts/${post._id}/applications/count/`, {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("access")}`,
+                },
+              });
+              return { jobId: post._id, count: countRes.data.count };
+            })
+          );
+
+          const counts = applicantCountsRes.reduce((acc, { jobId, count }) => {
+            acc[jobId] = count;
+            return acc;
+          }, {});
+
+          setApplicantCounts(counts);
+          setJobPosts(userJobPosts);
           } else {
             message.error("Failed to fetch job posts");
           }
@@ -86,11 +107,18 @@ function ManageJobPosts() {
       });
 
       if (res.status === 200) {
-        setApplicants(res.data);
-        setApplicantCounts((prevCounts) => ({
+        if (res.data.message) {
+          setApplicants([]);
+          message.info(res.data.message);
+        } else {
+          setApplicants(res.data);
+          setApplicantCounts((prevCounts) => ({
           ...prevCounts,
           [jobId]: res.data.length, // Update the applicant count for this job post
         }));
+
+        }
+        
       } else {
         message.error("Failed to fetch applicants");
       }
@@ -128,9 +156,14 @@ function ManageJobPosts() {
     setRecommendationModalVisible(true);
     setModalLoading(true);
     try {
-      const res = await api.get(`/AI/recommend/${jobId}/`);
+      const res = await api.get(`/AI/resume_similarity/${jobId}/`);
       if (res.status === 200) {
-        setRecommendations(res.data.recommendations);
+        if (res.data.message) {
+          setRecommendations([]);
+          message.info(res.data.message);
+        } else {
+          setRecommendations(res.data.recommendations);
+        }
       } else {
         message.error("Failed to fetch recommendations");
       }
@@ -139,6 +172,50 @@ function ManageJobPosts() {
       message.error("Failed to fetch recommendations");
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const fetchLastSavedRecommendations = async (jobId) => {
+    setSelectedJobId(jobId);
+    setLastSavedRecommendationModalVisible(true);
+    setModalLoading(true);
+    try {
+      const res = await api.get(`/AI/last_saved_recommendations/${jobId}/`);
+      if (res.status === 200) {
+        if (res.data.message) {
+          setNoSavedRecommendationsMessage(res.data.message);
+          setLastSavedRecommendations([]);
+        } else {
+          setNoSavedRecommendationsMessage("");
+          setLastSavedRecommendations(res.data.recommendations);
+        }
+      } else {
+        message.error("Failed to fetch last saved recommendations");
+      }
+    } catch (error) {
+      console.error("Failed to fetch last saved recommendations:", error);
+      message.error("Failed to fetch last saved recommendations");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const updateStatus = async (applicationId, status) => {
+    try {
+      const res = await api.put(`/Jobs/applications/${applicationId}/status/`, { status }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access")}`,
+        },
+      });
+      if (res.status === 200) {
+        message.success("Status updated successfully");
+        setApplicants(applicants.map(app => app._id === applicationId ? { ...app, status } : app));
+      } else {
+        message.error("Failed to update status");
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      message.error("Failed to update status");
     }
   };
 
@@ -184,9 +261,14 @@ function ManageJobPosts() {
       title: "Top 10 Best Resumes",
       key: "top_resumes",
       render: (text, record) => (
-        <Button type="link" onClick={() => fetchRecommendations(record._id)}>
-          View Resumes
-        </Button>
+        <div>
+          <Button type="link" onClick={() => fetchRecommendations(record._id)}>
+            View Resumes
+          </Button>
+          <Button type="link" onClick={() => fetchLastSavedRecommendations(record._id)}>
+            View Last Saved Resumes
+          </Button>
+        </div>
       ),
     },
     {
@@ -224,17 +306,63 @@ function ManageJobPosts() {
       key: "cover_letter",
     },
     {
-      title: "Action",
-      key: "action",
+      title: "Resume",
+      key: "resume",
       render: (text, record) => (
         <Button type="link" onClick={() => fetchResumeDetails(record.resume)}>
           View Resume
         </Button>
       ),
     },
+    {
+      title: "Status",
+      key: "status",
+      render: (text, record) => (
+        <div>
+          <Button
+            type={record.status === "Accepted" ? "primary" : "default"}
+            style={{ backgroundColor: record.status === "Accepted" ? "green" : "", margin: '0 2px', padding: '0 4px', fontSize: '10px' }}
+            onClick={() => updateStatus(record._id, "Accepted")}
+          >
+            Accepted
+          </Button>
+          <Button
+            type={record.status === "Rejected" ? "primary" : "default"}
+            style={{ backgroundColor: record.status === "Rejected" ? "red" : "", margin: '0 2px', padding: '0 4px', fontSize: '10px' }}
+            onClick={() => updateStatus(record._id, "Rejected")}
+          >
+            Rejected
+          </Button>
+          <Button
+            type={record.status === "In Progress" ? "primary" : "default"}
+            style={{ backgroundColor: record.status === "In Progress" ? "yellow" : "", margin: '0 2px', padding: '0 4px', fontSize: '10px' }}
+            onClick={() => updateStatus(record._id, "In Progress")}
+          >
+            In Progress
+          </Button>
+          <Button
+            type={record.status === "Not Treated Yet" ? "primary" : "default"}
+            style={{ backgroundColor: record.status === "Not Treated Yet" ? "blue" : "", margin: '0 2px', padding: '0 4px', fontSize: '10px' }}
+            onClick={() => updateStatus(record._id, "Not Treated Yet")}
+          >
+            Not Treated Yet
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   const recommendationColumns = [
+    {
+      title: "Name",
+      dataIndex: "name",
+      key: "name",
+    },
+    {
+      title: "Email",
+      dataIndex: "email",
+      key: "email",
+    },
     {
       title: "Resume ID",
       dataIndex: "resume_id",
@@ -292,6 +420,27 @@ function ManageJobPosts() {
           <Table
             className="modal-table"
             dataSource={recommendations}
+            columns={recommendationColumns}
+            rowKey="resume_id"
+            pagination={false} // Disable pagination to fit the modal
+          />
+        )}
+      </Modal>
+      <Modal
+        title="Last Saved Top 10 Best Resumes"
+        visible={lastSavedRecommendationModalVisible}
+        onCancel={() => setLastSavedRecommendationModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        {modalLoading ? (
+          <Spin size="large" />
+        ) : noSavedRecommendationsMessage ? (
+          <div>{noSavedRecommendationsMessage}</div>
+        ) : (
+          <Table
+            className="modal-table"
+            dataSource={lastSavedRecommendations}
             columns={recommendationColumns}
             rowKey="resume_id"
             pagination={false} // Disable pagination to fit the modal

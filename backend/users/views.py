@@ -1,5 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.http import JsonResponse
+from django.core.mail import send_mail, BadHeaderError
+from django.conf import settings
 from rest_framework import status, permissions
 from .serializers import CustomTokenObtainPairSerializer, UserSerializer, CustomTokenRefreshSerializer, ChangePasswordSerializer
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -10,9 +13,19 @@ from bson import ObjectId
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import bcrypt
-
 import pymongo
+from django.shortcuts import redirect
 
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.urls import reverse
+from django.core.mail import send_mail
+from rest_framework_simplejwt.tokens import AccessToken, TokenError
+from django.utils.http import urlsafe_base64_decode
+import jwt
+from datetime import datetime, timedelta
+from pymongo import MongoClient
+from .authentications import MongoUser
 client = pymongo.MongoClient("mongodb://localhost:27017/")
 db = client["demodatabase"]
 users_collection = db["users"]
@@ -23,12 +36,59 @@ class CustomTokenObtainPairView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = CustomTokenObtainPairSerializer(data=request.data)
         if serializer.is_valid():
-            return Response(serializer.validated_data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            user_email = serializer.validated_data.get('email')
+            
+            user = db.users.find_one({'email': user_email})
 
+            if user and not user.get('email_verified', False):
+                return Response({"detail": "You need to verify your account via your email."}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class CustomTokenRefreshView(TokenRefreshView):
     serializer_class = CustomTokenRefreshSerializer
+
+
+def send_welcome_email(to_email):
+    subject = 'Welcome to Our Site'
+    message = 'Hello, thank you for registering at our site.'
+    email_from = settings.EMAIL_HOST_USER
+    recipient_list = [to_email]
+    try:
+        send_mail(subject, message, email_from, recipient_list)
+        print("Email sent successfully to", to_email)
+        return True
+    except Exception as e:
+        print("Failed to send email:", e)
+        return False
+
+
+def generate_verification_token(user):
+    payload = {
+        'user_id': str(user['_id']),  # Convert ObjectId to string
+        'email': user['email'],
+        'exp': datetime.utcnow() + timedelta(hours=24),  # Token expiration time
+        'iat': datetime.utcnow(),  # Issued at time
+    }
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+    return token
+
+def send_verification_email(user_dict):
+    user = MongoUser(user_dict)
+    token = str(AccessToken.for_user(user))
+    uid = urlsafe_base64_encode(force_bytes(user._id))
+    verification_link = f"http://localhost:5173/verify_email/{uid}/{token}/"
+
+    send_mail(
+        'Verify your email',
+        f'Click the link to verify your email: {verification_link}',
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
+
 
 class UserCreateAPIView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -36,25 +96,17 @@ class UserCreateAPIView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
+            user_email = serializer.validated_data['email']
             user = serializer.save()
-            
-            
+
+            # Send verification email
+            send_verification_email(user)
+
             return Response({
                 "user": UserSerializer(user).data,
-                "message": "User created successfully"
+                "message": "User created successfully. Please check your email to verify your account."
             }, status=status.HTTP_201_CREATED)
-        else:
-            # Check if the error is due to the user existing or other validation failures
-            if 'email' in serializer.errors and 'already exists' in serializer.errors['email'][0]:
-                message = "User already exists"
-            else:
-                message = "Failed to create user"
-            
-            return Response({
-                "errors": serializer.errors,
-                "message": message
-            }, status=status.HTTP_400_BAD_REQUEST)
-    
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     def put(self, request, id):
         # Update an existing user
         user = self.get_object(id)
@@ -129,3 +181,42 @@ def get_user_profile(request):
             }
         }, status=status.HTTP_200_OK)
     return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+class VerifyEmailView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, uidb64, token):
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user_id = ObjectId(uid)
+
+            try:
+                AccessToken(token)  # Verify token
+            except TokenError:
+                return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Connect to MongoDB and update the user's email verification status
+            client = MongoClient(settings.MONGO_URI)
+            db = client[settings.MONGO_DB_NAME]
+            users_collection = db['users']
+            user = users_collection.find_one({"_id": user_id})
+
+            if not user:
+                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # Mark the email as verified
+            users_collection.update_one({"_id": user_id}, {"$set": {"email_verified": True}})
+            
+            # Redirect to frontend login page with a message
+            return redirect(f"http://localhost:5173/login?verified=true")
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+from rest_framework.permissions import BasePermission
+
+class IsEmailVerified(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return user.is_authenticated and user.email_verified

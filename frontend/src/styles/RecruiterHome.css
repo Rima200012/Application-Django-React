@@ -1,16 +1,24 @@
-/* Styles for Recruiter Home Page */
-
-.container {
-    padding: 20px;
-    background-color: #fff;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+.recruiter-home-page {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: transparent; /* Example background color */
+    overflow: hidden; /* Remove scrolling */
 }
 
-h1 {
-    font-size: 2em;
-    margin-bottom: 10px;
+.recruiter-dashboard-container {
+    background: transparent;
+    padding: 0; /* Remove padding */
+    width: 100%;
+    height: calc(100vh - 50px); 
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-p {
-    font-size: 1.2em;
+.recruiter-dashboard-embed {
+    width: 90%; /* Adjust width as needed */
+    height: 90vh; /* Adjust height to remove scrolling */
 }

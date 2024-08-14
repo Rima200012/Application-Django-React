@@ -33,6 +33,8 @@ class JobApplicationSerializer(serializers.Serializer):
     cover_letter = serializers.CharField()
     resume = serializers.FileField()
     added_by = serializers.CharField(max_length=24)
+    status = serializers.CharField(max_length=20, required=False, default="Not Treated Yet")
+
 
     def create(self, validated_data):
         db = MongoClient(settings.MONGO_URI)[settings.MONGO_DB_NAME]

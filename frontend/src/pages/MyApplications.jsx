@@ -88,6 +88,7 @@ function MyApplications() {
       message.error("Failed to fetch job details");
     }
   };
+
   const fetchResumeDetails = async (resumeId) => {
     try {
       const res = await api.get(`/Jobs/media/${resumeId}/`, {
@@ -106,6 +107,21 @@ function MyApplications() {
     } catch (error) {
       console.error("Failed to fetch resume:", error);
       message.error("Failed to fetch resume");
+    }
+  };
+
+  const getStatusMessage = (status) => {
+    switch (status) {
+      case "Accepted":
+        return "The recruiter (or the company) will contact you soon via email.";
+      case "Rejected":
+        return "Your application was not successful. Please apply to other opportunities.";
+      case "In Progress":
+        return "Your application is currently being reviewed.";
+      case "Not Treated Yet":
+        return "Your application has not been reviewed yet.";
+      default:
+        return "";
     }
   };
 
@@ -132,6 +148,17 @@ function MyApplications() {
         <Button type="link" onClick={() => fetchResumeDetails(record.resume)}>
           View Resume
         </Button>
+      ),
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (text, record) => (
+        <div>
+          <p>{record.status}</p>
+          <p>{getStatusMessage(record.status)}</p>
+        </div>
       ),
     },
     {

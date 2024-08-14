@@ -32,6 +32,8 @@ urlpatterns = [
     path("candidate/", include("candidate.urls")),
     path("Jobs/", include("Jobs.urls")),
     path('AI/', include('AI.urls')),
+    path('KPI/', include('KPI.urls')),
+
     #path("api/", include("api.urls"))
 ]
 if settings.DEBUG:

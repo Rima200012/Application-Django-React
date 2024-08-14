@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api';
 import { ACCESS_TOKEN, REFRESH_TOKEN } from '../constants';
 
@@ -21,35 +21,61 @@ export const AuthProvider = ({ children }) => {
     role: null
   });
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const accessToken = localStorage.getItem(ACCESS_TOKEN);
+      if (accessToken) {
+        try {
+          const userRes = await api.get('/users/users/me/', {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+          const userData = userRes.data.user;
+          setAuthState({
+            authenticated: true,
+            email: userData.email,
+            id: userData.id,
+            role: userData.role
+          });
+        } catch (error) {
+          console.log(error);
+        }
+      }
+    };
+    checkAuth();
+  }, []);
+
   const login = async (email, password) => {
     try {
       const res = await api.post("/users/token/", { email, password });
-      localStorage.setItem(ACCESS_TOKEN, res.data.access);
-      localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-
+      const { access, refresh } = res.data;
+  
+      localStorage.setItem(ACCESS_TOKEN, access);
+      localStorage.setItem(REFRESH_TOKEN, refresh);
+  
       // Fetch user details after login
       const userRes = await api.get("/users/users/me/", {
         headers: {
-          Authorization: `Bearer ${res.data.access}`,
+          Authorization: `Bearer ${access}`,
         },
       });
       const userData = userRes.data.user;
-      console.log("User data from backend:", userData); // Debug log
-
+  
       localStorage.setItem("role", userData.role);
       localStorage.setItem("userId", userData.id);
-
+  
       setAuthState({
         authenticated: true,
         email: userData.email,
         id: userData.id,
         role: userData.role
       });
-      console.log("Auth state after login:", authState); // Debug log
+  
       return true;
     } catch (error) {
-      alert("Login failed: " + error.message);
-      return false;
+      // Remove the alert and return the error to be handled by the component
+      throw error;  // This allows the error to be caught in the calling function
     }
   };
 

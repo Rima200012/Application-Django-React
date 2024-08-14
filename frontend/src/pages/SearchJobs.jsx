@@ -1,5 +1,6 @@
+// SearchJobs.jsx
 import React, { useEffect, useState } from "react";
-import { Card, Button, message, Row, Col, Modal } from "antd";
+import { Card, Button, message, Row, Col, Modal, Tag } from "antd";
 import api from "../api";
 import { useNavigate } from "react-router-dom";
 import "../styles/SearchJobs.css";
@@ -49,18 +50,24 @@ function SearchJobs() {
 
   return (
     <div className="search-jobs-container">
-      <h1>Job Listings</h1>
+      <h1>Latest Jobs</h1>
       <Row gutter={[16, 16]}>
         {jobPosts.map((job) => (
-          <Col key={job._id} xs={24} sm={12} md={8} lg={6}>
-            <Card title={job.title} bordered={false}>
-              <p><strong>{job.title}</strong></p>
-              <p>Company: {job.company_name}</p>
-              <p>Location: {job.location}</p>
-              <p>Status: {job.is_active ? "Active" : "Inactive"}</p>
-              <Button type="primary" onClick={() => showJobDetails(job)}>
-                View Details
-              </Button>
+          <Col key={job._id} xs={24} sm={24} md={24} lg={24}>
+            <Card className="job-card">
+              <div className="job-info">
+                <div className="job-title">{job.title}</div>
+                <div className="job-company">{job.company_name}</div>
+                <div className="job-location">{job.location}</div>
+                <div className="job-tags">
+                  {job.is_active ? <Tag color="green">Active</Tag> : <Tag color="red">Inactive</Tag>}
+                </div>
+              </div>
+              <div className="apply-button-container">
+                <Button type="primary" onClick={() => showJobDetails(job)}>
+                  View Details
+                </Button>
+              </div>
             </Card>
           </Col>
         ))}
@@ -75,7 +82,7 @@ function SearchJobs() {
             <Button key="cancel" onClick={handleCancel}>
               Cancel
             </Button>,
-            selectedJob.published_by === "LinkedIn" ? (
+            selectedJob.published_by === "669560f1100fd1361bc4e49c" ? (
               <Button key="apply" type="primary" onClick={() => handleApplyExternal(selectedJob.Job_link)}>
                 Apply on LinkedIn
               </Button>

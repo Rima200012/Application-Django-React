@@ -1,20 +1,18 @@
 import React from 'react';
-import CandidateNavbar from '../Layouts/CandidateNavBar';
-import { Layout, Typography } from 'antd';
+import { Layout } from 'antd';
+import PowerBIEmbedComponent from '../components/PowerBIEmbedComponent';
 import '../styles/candidatehome.css';
 
-const { Header, Content } = Layout;
-const { Title, Paragraph } = Typography;
+const { Content } = Layout;
 
 function CandidateHomePage() {
     return (
-        <Layout>
-            
-            <Content style={{ padding: '50px' }}>
-                <div className="container" style={{ background: '#fff', padding: '24px', minHeight: '280px' }}>
-                    <Title>Welcome to Django Jobs</Title>
-                    <Paragraph>Candidate Dashboard</Paragraph>
-                    {/* The PowerBI integration or other dashboard content will go here */}
+        <Layout className="candidate-home-page">
+            <Content>
+                <div className="candidate-dashboard-container">
+                    <div className="candidate-dashboard-embed">
+                        <PowerBIEmbedComponent userType="candidate" />
+                    </div>
                 </div>
             </Content>
         </Layout>
